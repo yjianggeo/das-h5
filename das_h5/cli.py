@@ -69,6 +69,7 @@ def main():
     parser.add_argument('-imc', '--imshow_cmap', type=str, default='RdBu', help='Imshow fig colormap--optional')
     parser.add_argument('-imn', '--imshow_norm', type=float, nargs=2, default=[-1, 1], help='Imshow fig colorbar norm--optional')
     parser.add_argument('-ims', '--imshow_show', nargs='?', const=True, default=False, help='The imshow fig shows--optional')
+    parser.add_argument('-ng', '--norm_global', nargs='?', const=True, default=False, help='Use global (whole-array) normalization for section plots instead of per-channel--optional')
 
     # fill plot
     parser.add_argument('-flo', '--fill_out', type=str, default=False, help='Out fill color fig name (include path)--optional')
@@ -444,7 +445,8 @@ def main():
                             norm=single_norm, show_rate=args.single_rate)
 
         if args.imshow_show or args.imshow_out or args.fill_show or args.fill_out:
-            data = norm_data(data)
+            norm_type = 'all' if args.norm_global else 'self'
+            data = norm_data(data, type=norm_type)
 
         if args.imshow_show or args.imshow_out:
             print('\nPlotting imshow figure ...')

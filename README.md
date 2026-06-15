@@ -6,8 +6,8 @@ DAS（分布式声学传感）HDF5 数据命令行处理工具——读取原始
 **Workflow / 流程:** read h5 (build CSV database index) → window/channel select → detrend + filter → export (SAC / NumPy) **and/or** plot (waterfall / wiggle / single-trace / PSD / audio)
 读取 h5（建立 CSV 数据库索引）→ 选时窗/道窗 → 去趋势 + 滤波 → 导出（SAC / NumPy）**和/或** 绘图（瀑布图 / wiggle / 单道 / PSD / 声音）
 
-> Repackaged and reorganized from the original `DASh5.py` toolkit (By Hardy Hong). Algorithms are unchanged; this package adds a clean module layout, a `dash5` console entry point, and synthetic-data tests.
-> 由原始 `DASh5.py` 工具（Hardy Hong 著）整理重构而来。算法逻辑未改动；本包仅增加清晰的模块结构、`dash5` 命令行入口和合成数据测试。
+> Repackaged and reorganized from the original `DASh5.py` toolkit by **Hong Heting (洪鹤庭, "Hardy Hong")**. The original algorithms are preserved; this package adds a clean module layout, a `dash5` console entry point, synthetic-data tests, and one optional new feature — global (whole-array) normalization for section plots (`-ng`).
+> 本包在 **洪鹤庭（Hardy Hong）** 的原始 `DASh5.py` 代码基础上整理、修改而来。原始算法逻辑予以保留；本包新增清晰的模块结构、`dash5` 命令行入口、合成数据测试，以及一项可选新功能——剖面图的整体（全局）归一化（`-ng`）。
 
 🌐 **[English](#english)** | **[中文](#中文)**
 
@@ -23,7 +23,7 @@ DAS（分布式声学传感）HDF5 数据命令行处理工具——读取原始
 - **HDF5 database index**: scans a directory tree of `.h5` files once into a CSV index (`.db`), so later extractions are fast and resumable; data gaps are zero-filled automatically.
 - **Export**: to SAC (with event/location SAC headers) or NumPy `.npy`; a low-memory streaming path (`-sof`) converts large h5 volumes directly to SAC.
 - **Filtering**: zero-phase Butterworth `bandpass` / `bandstop` / `lowpass` / `highpass`, with configurable order; anti-alias `decimate`.
-- **Section plots**: waterfall (`imshow`) and wiggle (`fill_between`) images, horizontal or vertical.
+- **Section plots**: waterfall (`imshow`) and wiggle (`fill_between`) images, horizontal or vertical, with per-channel or global (`-ng`) amplitude normalization.
 - **Single-trace plots**: waveform + spectrogram for one channel, or a batch over a channel range.
 - **PSD suite**: Welch power-spectral-density with a six-figure analysis set (time/freq/channel views, PQLX-style statistics), with on-disk PSD caching (`.pkl`).
 - **Audio**: convert a single DAS trace to an audible `.wav`.
@@ -135,6 +135,7 @@ dash5 -h5 -d h5_file/ -idb h5_test.db -T 20230705174505 -b 0 -e 60 -c 0 -C 100 -
 | `-imc` / `-imn` | `--imshow_cmap` / `--imshow_norm` | Colormap / color-norm range, e.g. `-imn -0.5 0.5` |
 | `-flo` / `-fls` | `--fill_out` / `--fill_show` | Save / show wiggle figure |
 | `-flc` / `-flg` | `--fill_cmap` / `--fill_gain` | Fill colors (e.g. `r b`) / wave gain |
+| `-ng` | `--norm_global` | Global (whole-array) amplitude normalization for section plots, instead of the default per-channel |
 | `-v` | `--vertical` | Vertical orientation (channel on x-axis) |
 | `-fz` / `-dpi` | `--fig_size` / `--fig_dpi` | Figure size / DPI |
 
@@ -237,7 +238,7 @@ MIT
 - **HDF5 数据库索引**：把一棵 `.h5` 目录树扫描一次，写成 CSV 索引（`.db`），之后的提取既快又可断点续用；数据缺口自动补零。
 - **导出**：导出为 SAC（含事件/台站 SAC 头）或 NumPy `.npy`；低内存流式通道（`-sof`）可把超大 h5 数据直接转为 SAC。
 - **滤波**：零相位 Butterworth `bandpass` / `bandstop` / `lowpass` / `highpass`，阶数可调；抗混叠 `decimate`。
-- **剖面图**：波形瀑布图（`imshow`）与 wiggle 图（`fill_between`），可横向或纵向。
+- **剖面图**：波形瀑布图（`imshow`）与 wiggle 图（`fill_between`），可横向或纵向，幅度可按道归一化或整体归一化（`-ng`）。
 - **单道图**：单个通道的波形 + 频谱图，或对一段道范围批量出图。
 - **PSD 套件**：Welch 功率谱密度，配六图分析套件（时间/频率/通道视角、PQLX 风格统计），并支持 PSD 磁盘缓存（`.pkl`）。
 - **声音**：把单个 DAS 道转换为可听的 `.wav`。
@@ -349,6 +350,7 @@ dash5 -h5 -d h5_file/ -idb h5_test.db -T 20230705174505 -b 0 -e 60 -c 0 -C 100 -
 | `-imc` / `-imn` | `--imshow_cmap` / `--imshow_norm` | 色图 / 颜色归一化范围，如 `-imn -0.5 0.5` |
 | `-flo` / `-fls` | `--fill_out` / `--fill_show` | 保存 / 显示 wiggle 图 |
 | `-flc` / `-flg` | `--fill_cmap` / `--fill_gain` | 填充颜色（如 `r b`）/ 波形增益 |
+| `-ng` | `--norm_global` | 剖面图整体（全局）幅度归一化，替代默认的按道归一化 |
 | `-v` | `--vertical` | 纵向排列（通道在 x 轴）|
 | `-fz` / `-dpi` | `--fig_size` / `--fig_dpi` | 图尺寸 / DPI |
 

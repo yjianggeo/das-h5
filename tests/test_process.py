@@ -15,6 +15,18 @@ def test_norm_data_peak_is_one():
     assert np.allclose(np.max(np.abs(out), axis=0), 1.0)
 
 
+def test_norm_data_global_scales_by_single_max():
+    # Per-channel ('self') normalizes each column to peak 1; global ('all')
+    # divides the whole array by one scalar, so relative amplitudes are kept.
+    data = np.array([[2.0, -4.0], [1.0, 2.0]])
+    out = norm_data(data.copy(), type='all')
+    # whole-array peak is |-4| = 4; everything divided by 4
+    assert np.isclose(np.max(np.abs(out)), 1.0)
+    assert np.allclose(out, data / 4.0)
+    # the second column keeps a peak of 1, the first does not (unlike 'self')
+    assert not np.isclose(np.max(np.abs(out[:, 0])), 1.0)
+
+
 def test_detrend_removes_linear_trend():
     n = 1000
     trend = (3.0 * np.arange(n) + 5.0)[:, None]
