@@ -250,8 +250,12 @@ def read_h5(db_list=None, db_file=None, time_flag=None, need_sample=None,
     if db_time_end_final > 0:
         h5_data = np.concatenate((h5_data, pad0_point_end), axis=0)
 
-    # # convert rad s^-1 to the s^-1   2024.05.15 hht
-    h5_data = h5_data * 1.550 * 1e-6 / (4 * np.pi * 1.467 * das_gl * 0.78)
+    # convert phase change rate to strain rate (s^-1)
+    # strain_rate = raw * 107.9 * 1e-9 * frequency / gauge_length, where frequency is the
+    # repetition / time sampling rate from the metadata (OutputDataRate = 1/native delta).
+    # Matches the conversion used in io/sac_export.py.
+    frequency = 1.0 / db_choose['delta'].iloc[0]
+    h5_data = h5_data * 107.9 * 1e-9 * frequency / das_gl
     return h5_data, dt
 
 def read_sac(sacpath=None, ref_time=None, begin_time=0, end_time=10,

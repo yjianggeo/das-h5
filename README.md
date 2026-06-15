@@ -202,13 +202,13 @@ Caching: `-opd dir/` writes the computed PSD to a `.pkl`; `-ipd dir/` reads it b
 
 ### Algorithm notes
 
-**Strain-rate conversion.** Raw HDF5 samples (optical phase change) are converted to strain rate in `read_h5` using the fiber/interrogator constants and the per-file gauge length:
+**Strain-rate conversion.** Raw HDF5 samples (phase change rate) are converted to strain rate in `read_h5` as:
 
 ```
-strain_rate = raw · 1.550e-6 / (4π · 1.467 · GaugeLength · 0.78)
+strain_rate = raw · 107.9 · 1e-9 · frequency / GaugeLength
 ```
 
-`GaugeLength` is read from the `Acquisition` group attributes; the sample rate from `OutputDataRate`. Across multiple files, time gaps and out-of-range edges are zero-padded.
+where `frequency` is the repetition / time sampling rate from the metadata (`OutputDataRate`, i.e. `1 / native delta`) and `GaugeLength` is read from the `Acquisition` group attributes. Across multiple files, time gaps and out-of-range edges are zero-padded.
 
 **Welch PSD.** `das_psd` uses `scipy.signal.welch` per sliding window (Hann window, `nperseg` = window samples, `nfft = nextpow2(window/delta)`, one-sided, `density` scaling [V²/Hz]). Results are sliced to the requested frequency band(s), and `das_psd_type` derives the RMS/time/frequency/statistics arrays for the six figures.
 
@@ -417,13 +417,13 @@ dash5 -h5 -idb h5_test.db -T 20230618125701 -b 46 -e 56 -c 0 -C 2000 \
 
 ### 算法说明
 
-**应变率换算。** 原始 HDF5 采样（光相位变化）在 `read_h5` 中按光纤/解调常数与各文件标距长度换算为应变率：
+**应变率换算。** 原始 HDF5 采样（相位变化率）在 `read_h5` 中换算为应变率：
 
 ```
-strain_rate = raw · 1.550e-6 / (4π · 1.467 · GaugeLength · 0.78)
+strain_rate = raw · 107.9 · 1e-9 · frequency / GaugeLength
 ```
 
-`GaugeLength` 取自 `Acquisition` 组属性，采样率取自 `OutputDataRate`。跨多文件时，时间缺口与超界边缘以补零处理。
+其中 `frequency` 为重复频率 / 时间采样率，取自元数据 `OutputDataRate`（即 `1 / 原始 delta`）；`GaugeLength` 取自 `Acquisition` 组属性。跨多文件时，时间缺口与超界边缘以补零处理。
 
 **Welch PSD。** `das_psd` 对每个滑动窗用 `scipy.signal.welch` 计算（Hann 窗，`nperseg` = 窗内样点，`nfft = nextpow2(窗长/delta)`，单边，`density` 归一化 [V²/Hz]）。结果按所需频带切片，`das_psd_type` 再派生出六张图所需的 RMS/时间/频率/统计数组。
 
