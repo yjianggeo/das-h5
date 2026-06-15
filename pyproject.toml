@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "das-h5"
+version = "0.1.0"
+description = "Command-line DAS HDF5 processing, visualization, PSD analysis and audio conversion."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "numpy",
+    "scipy",
+    "obspy",
+    "pandas",
+    "h5py",
+    "matplotlib",
+    "tqdm",
+    "psutil",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+dash5 = "das_h5.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["das_h5*"]
