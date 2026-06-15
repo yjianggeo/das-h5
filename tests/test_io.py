@@ -30,6 +30,11 @@ def test_make_dbfile_and_read_h5_roundtrip(tmp_path):
     assert abs(dt - 0.001) < 1e-9
     assert 490 <= data.shape[0] <= 510
 
+    # strain-rate conversion: raw * 107.9 * 1e-9 * frequency / gauge_length,
+    # with frequency = OutputDataRate (1000 Hz) and gauge_length = 10 m.
+    # The synthetic RawData has value k in row k, so row 1 == 1 * 107.9e-9 * 1000 / 10.
+    assert np.isclose(data[1, 0], 1.0 * 107.9 * 1e-9 * 1000.0 / 10.0)
+
 
 def test_save_npz_roundtrip(tmp_path):
     data = np.random.randn(200, 4).astype(np.float32)
