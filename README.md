@@ -26,8 +26,9 @@ DAS（分布式声学传感）HDF5 数据命令行处理工具——读取原始
 - **Section plots**: waterfall (`imshow`) and wiggle (`fill_between`) images, horizontal or vertical, with per-channel or global (`-ng`) amplitude normalization.
 - **Single-trace plots**: waveform + spectrogram for one channel, or a batch over a channel range.
 - **PSD suite**: Welch power-spectral-density with a six-figure analysis set (time/freq/channel views, PQLX-style statistics), with on-disk PSD caching (`.pkl`).
+- **Poincaré spectral coherence / BI**: two-band spectral fingerprints + block-wise Poincaré coherence give cable coupling-irregularity maps (`C_smooth`) and a burial-index (BI) profile, following Shiri & Belal (2026, *Sci. Rep.* 16:23647); an optional scan searches the optimal low/high band pair for the dataset.
 - **Audio**: convert a single DAS trace to an audible `.wav`.
-- **Tested**: synthetic-data unit tests for the processing, PSD, and I/O modules — no real DAS files required.
+- **Tested**: synthetic-data unit tests for the processing, PSD, coherence, and I/O modules — no real DAS files required.
 
 ### Install
 
@@ -149,6 +150,38 @@ dash5 -h5 -d h5_file/ -idb h5_test.db -T 20230705174505 -b 0 -e 60 -c 0 -C 100 -
 | `-sdo` | `--sound_outpath` | Write `.wav` for the chosen `-num` trace |
 | `-sds` / `-sdg` / `-sdi` | `--sound_scale` / `--sound_gain` / `--sound_interp` | Playback rate scale / amplitude gain / interpolation |
 
+**Poincaré coherence / BI**
+
+Activate with `-pc` (compute BI) and/or `-obp` (search the optimal band pair). The band pair is given by `-lb`/`-hb`; if omitted, the optimal pair is searched automatically before BI is computed. Window length/step reuse `-wle`/`-wst` (default 2 s / 1 s).
+
+| Flag | Long | Meaning |
+|---|---|---|
+| `-pc` | `--poincare_coh` | Compute the BI profile |
+| `-obp` | `--opt_band_pair` | Search the optimal band pair (scan) |
+| `-lb` / `-hb` | `--low_band` / `--high_band` | Fingerprint bands in Hz, e.g. `-lb 0.1 10 -hb 100 120` |
+| `-nb` / `-dx` | `--block_channels` / `--channel_dx` | Channels per block (default 10) / channel spacing in m (default 4.0) |
+| `-sml` / `-gf` | `--smooth_len` / `--grad_floor` | Smoothing scale in m (default 3.0) / gradient-floor factor α (default 0.05) |
+| `-bio` | `--bi_out` | Save BI + coherence maps to a `.npz` file |
+| `-bif` / `-cmf` | `--bi_fig` / `--cohmap_fig` | Save BI profile / C_smooth map figure |
+| `-bsf` | `--bandscore_fig` | Save the band-pair score heatmap |
+| `-pcs` | `--pcoh_show` | Show the figures |
+
+**Examples:**
+
+```bash
+# Optimal band pair search + score heatmap
+dash5 -h5 -idb h5_test.db -T 20230705174505 -b 0 -e 120 -c 0 -C 831 \
+      -obp -dx 4.09 -bsf bandscore.png
+
+# BI with a given band pair, save figure + npz
+dash5 -h5 -idb h5_test.db -T 20230705174505 -b 0 -e 120 -c 0 -C 831 \
+      -pc -lb 0.1 10 -hb 100 120 -dx 4.09 -bif bi.png -cmf csmooth.png -bio bi.npz
+
+# BI with automatic band-pair optimisation
+dash5 -h5 -idb h5_test.db -T 20230705174505 -b 0 -e 120 -c 0 -C 831 \
+      -pc -dx 4.09 -bif bi.png
+```
+
 **Examples:**
 
 ```bash
@@ -197,6 +230,7 @@ Caching: `-opd dir/` writes the computed PSD to a `.pkl`; `-ipd dir/` reads it b
 | `das_h5.process` | Detrend, normalization, IIR filtering (`filters`); anti-alias decimation and interpolation (`resample`) |
 | `das_h5.viz` | Waterfall imshow (`waterfall`), wiggle fill (`wiggle`), single-trace + spectrogram (`trace`) |
 | `das_h5.psd` | Welch PSD computation (`compute`); six-figure plotting suite (`plots`) |
+| `das_h5.coherence` | Band-pair optimisation + Poincaré coherence/BI (`compute`); coherence map, BI profile and score heatmap (`plots`) |
 | `das_h5.sound` | DAS trace → `.wav` audio (`audio`) |
 | `das_h5.cli` | Argparse command-line orchestration (`dash5` entry point) |
 
@@ -214,13 +248,15 @@ where `frequency` is the repetition / time sampling rate from the metadata (`Out
 
 **Single-trace spectrogram.** `viz.trace` computes the spectrogram via `matplotlib.mlab` and renders it alongside the filtered waveform.
 
+**Poincaré spectral coherence / BI.** `coherence.compute` implements the four-stage framework of Shiri & Belal (2026, *Sci. Rep.* 16:23647): (1) two-band spectral fingerprints from band-integrated power (FBE, Hann-tapered DFT per sliding window); (2) block-wise Poincaré-style coherence `C_eff = spread / max(grad, α·scale)` over blocks of `M` channels; (3) robust log–MAD normalisation; (4) spatial Gaussian smoothing, whose temporal median is the BI (burial / coupling-irregularity index). The fingerprint is a normalised band-power ratio, so the metric is independent of instrument units. `optimize_band_pair` pre-bins the window spectra and scores candidate band pairs by spatial contrast × split-half (temporal) stability.
+
 ### Running tests
 
 ```bash
 pytest tests/ -v
 ```
 
-8 tests use synthetic data (process filtering/decimation, Welch PSD peak location, HDF5 read/write round-trip) — no real DAS files required.
+13 tests use synthetic data (process filtering/decimation, Welch PSD peak location, Poincaré coherence/BI and band-pair optimisation, HDF5 read/write round-trip) — no real DAS files required.
 
 ### License
 
@@ -241,8 +277,9 @@ MIT
 - **剖面图**：波形瀑布图（`imshow`）与 wiggle 图（`fill_between`），可横向或纵向，幅度可按道归一化或整体归一化（`-ng`）。
 - **单道图**：单个通道的波形 + 频谱图，或对一段道范围批量出图。
 - **PSD 套件**：Welch 功率谱密度，配六图分析套件（时间/频率/通道视角、PQLX 风格统计），并支持 PSD 磁盘缓存（`.pkl`）。
+- **Poincaré 谱相干 / BI**：双频带谱指纹 + 块级 Poincaré 相干，输出光缆耦合不规则图（`C_smooth`）与埋设指数（BI）剖面，方法遵循 Shiri & Belal (2026, *Sci. Rep.* 16:23647)；可选扫描搜索本数据集的最优低/高频带对。
 - **声音**：把单个 DAS 道转换为可听的 `.wav`。
-- **测试**：处理、PSD、I/O 模块均有合成数据单元测试，无需真实 DAS 文件即可运行。
+- **测试**：处理、PSD、谱相干、I/O 模块均有合成数据单元测试，无需真实 DAS 文件即可运行。
 
 ### 安装
 
@@ -364,6 +401,38 @@ dash5 -h5 -d h5_file/ -idb h5_test.db -T 20230705174505 -b 0 -e 60 -c 0 -C 100 -
 | `-sdo` | `--sound_outpath` | 为所选 `-num` 道写出 `.wav` |
 | `-sds` / `-sdg` / `-sdi` | `--sound_scale` / `--sound_gain` / `--sound_interp` | 播放速率倍数 / 幅度增益 / 插值 |
 
+**Poincaré 谱相干 / BI**
+
+用 `-pc`（计算 BI）和/或 `-obp`（搜索最优频带对）激活。频带对由 `-lb`/`-hb` 给定；若不给出，则先自动搜索最优频带对再计算 BI。窗长/步长复用 `-wle`/`-wst`（默认 2 s / 1 s）。
+
+| 参数 | 全称 | 含义 |
+|---|---|---|
+| `-pc` | `--poincare_coh` | 计算 BI 剖面 |
+| `-obp` | `--opt_band_pair` | 搜索最优频带对（扫描）|
+| `-lb` / `-hb` | `--low_band` / `--high_band` | 谱指纹频带（Hz），如 `-lb 0.1 10 -hb 100 120` |
+| `-nb` / `-dx` | `--block_channels` / `--channel_dx` | 每块道数（默认 10）/ 道间距（米，默认 4.0）|
+| `-sml` / `-gf` | `--smooth_len` / `--grad_floor` | 平滑尺度（米，默认 3.0）/ 梯度下限因子 α（默认 0.05）|
+| `-bio` | `--bi_out` | 把 BI 与相干图保存为 `.npz` |
+| `-bif` / `-cmf` | `--bi_fig` / `--cohmap_fig` | 保存 BI 剖面图 / C_smooth 相干图 |
+| `-bsf` | `--bandscore_fig` | 保存频带对得分热图 |
+| `-pcs` | `--pcoh_show` | 显示图件 |
+
+**示例：**
+
+```bash
+# 最优频带对搜索 + 得分热图
+dash5 -h5 -idb h5_test.db -T 20230705174505 -b 0 -e 120 -c 0 -C 831 \
+      -obp -dx 4.09 -bsf bandscore.png
+
+# 指定频带对计算 BI，保存图件与 npz
+dash5 -h5 -idb h5_test.db -T 20230705174505 -b 0 -e 120 -c 0 -C 831 \
+      -pc -lb 0.1 10 -hb 100 120 -dx 4.09 -bif bi.png -cmf csmooth.png -bio bi.npz
+
+# 自动搜索最优频带对并计算 BI
+dash5 -h5 -idb h5_test.db -T 20230705174505 -b 0 -e 120 -c 0 -C 831 \
+      -pc -dx 4.09 -bif bi.png
+```
+
 **示例：**
 
 ```bash
@@ -412,6 +481,7 @@ dash5 -h5 -idb h5_test.db -T 20230618125701 -b 46 -e 56 -c 0 -C 2000 \
 | `das_h5.process` | 去趋势、归一化、IIR 滤波（`filters`）；抗混叠抽稀与插值（`resample`）|
 | `das_h5.viz` | 瀑布图 imshow（`waterfall`）、wiggle fill（`wiggle`）、单道 + 频谱图（`trace`）|
 | `das_h5.psd` | Welch PSD 计算（`compute`）；六图绘制套件（`plots`）|
+| `das_h5.coherence` | 频带对寻优 + Poincaré 谱相干/BI（`compute`）；相干图、BI 剖面、得分热图（`plots`）|
 | `das_h5.sound` | DAS 单道 → `.wav` 声音（`audio`）|
 | `das_h5.cli` | argparse 命令行编排（`dash5` 入口）|
 
@@ -429,13 +499,15 @@ strain_rate = raw · 107.9 · 1e-9 · frequency / GaugeLength
 
 **单道频谱图。** `viz.trace` 用 `matplotlib.mlab` 计算频谱图，与滤波后的波形并排绘制。
 
+**Poincaré 谱相干 / BI。** `coherence.compute` 实现 Shiri & Belal (2026, *Sci. Rep.* 16:23647) 的四阶段框架：① 双频带谱指纹（每个滑动窗做 Hann 窗 DFT，取带限功率 FBE）；② 以 M 道为块计算 Poincaré 式相干 `C_eff = spread / max(grad, α·scale)`；③ log–MAD 稳健归一化；④ 空间高斯平滑，其时间中位数即 BI（埋设 / 耦合不规则指数）。谱指纹是带功率的归一化比值，因此指标与仪器单位无关。`optimize_band_pair` 先把时窗谱按细频箱预分箱，再对候选频带对按"空间对比度 × 半程时间稳定性"打分。
+
 ### 运行测试
 
 ```bash
 pytest tests/ -v
 ```
 
-8 个测试使用合成数据（处理滤波/抽稀、Welch PSD 峰值定位、HDF5 读写往返），无需真实 DAS 文件。
+13 个测试使用合成数据（处理滤波/抽稀、Welch PSD 峰值定位、Poincaré 谱相干/BI 与频带对寻优、HDF5 读写往返），无需真实 DAS 文件。
 
 ### 许可证
 

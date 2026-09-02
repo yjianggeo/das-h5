@@ -27,6 +27,10 @@ from das_h5.psd.plots import (
     plot_psd_channel_statistic, plot_psd_freq_time_single, plot_cure_single,
 )
 from das_h5.sound.audio import das_sound
+from das_h5.coherence.compute import das_bi, optimize_band_pair
+from das_h5.coherence.plots import (
+    plot_coherence_map, plot_bi_profile, plot_band_scores,
+)
 
 
 def main():
@@ -126,6 +130,21 @@ def main():
     parser.add_argument('-sdg', '--sound_gain', type=int, default=5000, help='Sound data scale-Data*Gain--optional')
     parser.add_argument('-sdo', '--sound_outpath', type=str, default=False, help='Out sound data path--optional')
     parser.add_argument('-sdi', '--sound_interp', type=int, default=False, help='Whether to interp data, the interp scale--optional')
+
+    # Poincare coherence / BI model 2026.09.02
+    parser.add_argument('-pc', '--poincare_coh', nargs='?', const=True, default=False, help='Run the Poincare coherence model and compute BI--optional')
+    parser.add_argument('-obp', '--opt_band_pair', nargs='?', const=True, default=False, help='Search the optimal band pair--optional')
+    parser.add_argument('-lb', '--low_band', type=float, nargs=2, default=False, help='Low band of the spectral fingerprint [Hz], e.g. -lb 0.1 10--optional')
+    parser.add_argument('-hb', '--high_band', type=float, nargs=2, default=False, help='High band of the spectral fingerprint [Hz], e.g. -hb 100 120--optional')
+    parser.add_argument('-nb', '--block_channels', type=int, default=10, help='Channels per block M (default 10)--optional')
+    parser.add_argument('-dx', '--channel_dx', type=float, default=4.0, help='Channel spacing [m] (default 4.0)--optional')
+    parser.add_argument('-sml', '--smooth_len', type=float, default=3.0, help='Spatial smoothing scale L_smooth [m] (default 3.0)--optional')
+    parser.add_argument('-gf', '--grad_floor', type=float, default=0.05, help='Gradient-floor factor alpha (default 0.05)--optional')
+    parser.add_argument('-bio', '--bi_out', type=str, default=False, help='Save BI and coherence results to a .npz file--optional')
+    parser.add_argument('-bif', '--bi_fig', type=str, default=False, help='Save the BI profile figure--optional')
+    parser.add_argument('-cmf', '--cohmap_fig', type=str, default=False, help='Save the C_smooth coherence map figure--optional')
+    parser.add_argument('-bsf', '--bandscore_fig', type=str, default=False, help='Save the band-pair score heatmap figure--optional')
+    parser.add_argument('-pcs', '--pcoh_show', nargs='?', const=True, default=False, help='Show the coherence figures--optional')
 
 
     args = parser.parse_args()
@@ -292,7 +311,8 @@ def main():
             return
 
         # get all or part sac data
-        if args.imshow_out or args.imshow_show or args.fill_out or args.fill_show:
+        if args.imshow_out or args.imshow_show or args.fill_out or args.fill_show \
+                or args.poincare_coh or args.opt_band_pair:
             print('\nGetting all data from sac file ...')
             data, delta = read_sac(data_dir, ref_time=ref_time, begin_time=b, end_time=e,
                                    begin_channel=ci, end_channel=ca)
@@ -598,6 +618,85 @@ def main():
                              channel=ch_choose_range, fss=fss[0][num], freq_scale=args.freq_log, period=args.period_model,
                              figsave=args.figs_all+'psd-'+title_psd+'fig6.png', figsize=(7.8, 6), show=args.figs_show, dpi=dpi)
 
+
+    # Poincare coherence / BI model. 2026.09.02
+    # (Shiri & Belal 2026, Sci. Rep. 16:23647)
+    if args.opt_band_pair or args.poincare_coh:
+        print('\nRunning Poincare coherence model ...')
+        wind_len_coh = args.wind_len if args.wind_len else 2.0
+        wind_step_coh = args.wind_step if args.wind_step else 1.0
+        if args.figtitle:
+            title_coh = args.figtitle
+        else:
+            title_coh = None
+
+        if args.opt_band_pair or not (args.low_band and args.high_band):
+            # if the band pair is not given, search the optimal one first
+            print('\nSearching the optimal band pair ...')
+            best_pair, band_scores = optimize_band_pair(
+                das_data=data, delta=delta, wind_len=wind_len_coh,
+                wind_step=wind_step_coh, block=args.block_channels,
+                alpha=args.grad_floor, channel_dx=args.channel_dx,
+                smooth_len=args.smooth_len)
+            (bl0, bl1), (bh0, bh1) = best_pair
+            print('>>>·<<<')
+            print('Optimal band pair: low %g-%g Hz | high %g-%g Hz'
+                  % (bl0, bl1, bh0, bh1))
+            print('Top 5 band pairs (low | high | contrast | stability | score):')
+            for row in band_scores[:5]:
+                print('  %g-%g Hz | %g-%g Hz | %.3f | %.3f | %.3f'
+                      % (row[0], row[1], row[2], row[3], row[4], row[5], row[6]))
+            print('>>>·<<<')
+            if args.bandscore_fig:
+                print('\nPlotting band-pair score heatmap ...')
+                plot_band_scores(band_scores, figsave=args.bandscore_fig,
+                                 show=args.pcoh_show, dpi=dpi)
+            bands = best_pair
+        else:
+            bands = ((args.low_band[0], args.low_band[1]),
+                     (args.high_band[0], args.high_band[1]))
+
+        if args.poincare_coh:
+            print('\nCalculating BI with band pair low %g-%g Hz | high %g-%g Hz ...'
+                  % (bands[0][0], bands[0][1], bands[1][0], bands[1][1]))
+            res = das_bi(das_data=data, delta=delta, bands=bands,
+                         wind_len=wind_len_coh, wind_step=wind_step_coh,
+                         block=args.block_channels, alpha=args.grad_floor,
+                         channel_dx=args.channel_dx, smooth_len=args.smooth_len)
+            bi = res['bi']
+            print('>>>·<<<')
+            print('BI: %d blocks, median %.3f, max %.3f at %.0f m'
+                  % (len(bi), np.median(bi), np.max(bi),
+                     res['block_distance'][int(np.argmax(bi))]))
+            print('>>>·<<<')
+
+            if args.bi_fig:
+                print('\nPlotting BI profile ...')
+                plot_bi_profile(bi, channel_begin=ci, block=args.block_channels,
+                                channel_dx=args.channel_dx, bands=bands,
+                                title=title_coh, figsave=args.bi_fig,
+                                show=args.pcoh_show, dpi=dpi)
+
+            if args.cohmap_fig:
+                print('\nPlotting C_smooth coherence map ...')
+                plot_coherence_map(res['c_smooth'], wind_step=wind_step_coh,
+                                   channel_begin=ci, block=args.block_channels,
+                                   channel_dx=args.channel_dx, bands=bands,
+                                   title=title_coh, figsave=args.cohmap_fig,
+                                   show=args.pcoh_show, dpi=dpi)
+
+            if args.bi_out:
+                print('\nSaving BI results ...')
+                np.savez(args.bi_out, bi=res['bi'],
+                         block_distance=res['block_distance'],
+                         block_channels=res['block_channels'],
+                         c_raw=res['c_raw'], c_norm=res['c_norm'],
+                         c_smooth=res['c_smooth'], times=res['times'],
+                         bands=np.array(bands),
+                         wind_len=wind_len_coh, wind_step=wind_step_coh,
+                         block=args.block_channels, alpha=args.grad_floor,
+                         channel_dx=args.channel_dx, smooth_len=args.smooth_len)
+                print('Saving BI >>> ' + args.bi_out + ' Successfully!')
 
     end_time = time.time()
     print('\nDone! Time is ', str('%.2f'%(end_time-start_time)), 's!')
