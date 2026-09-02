@@ -137,8 +137,7 @@ def main():
     parser.add_argument('-lb', '--low_band', type=float, nargs=2, default=False, help='Low band of the spectral fingerprint [Hz], e.g. -lb 0.1 10--optional')
     parser.add_argument('-hb', '--high_band', type=float, nargs=2, default=False, help='High band of the spectral fingerprint [Hz], e.g. -hb 100 120--optional')
     parser.add_argument('-nb', '--block_channels', type=int, default=10, help='Channels per block M (default 10)--optional')
-    parser.add_argument('-dx', '--channel_dx', type=float, default=4.0, help='Channel spacing [m] (default 4.0)--optional')
-    parser.add_argument('-sml', '--smooth_len', type=float, default=3.0, help='Spatial smoothing scale L_smooth [m] (default 3.0)--optional')
+    parser.add_argument('-sml', '--smooth_len', type=float, default=0.75, help='Spatial Gaussian smoothing sigma in channel samples (default 0.75 = 3 m at 4 m spacing)--optional')
     parser.add_argument('-gf', '--grad_floor', type=float, default=0.05, help='Gradient-floor factor alpha (default 0.05)--optional')
     parser.add_argument('-bio', '--bi_out', type=str, default=False, help='Save BI and coherence results to a .npz file--optional')
     parser.add_argument('-bif', '--bi_fig', type=str, default=False, help='Save the BI profile figure--optional')
@@ -636,8 +635,7 @@ def main():
             best_pair, band_scores = optimize_band_pair(
                 das_data=data, delta=delta, wind_len=wind_len_coh,
                 wind_step=wind_step_coh, block=args.block_channels,
-                alpha=args.grad_floor, channel_dx=args.channel_dx,
-                smooth_len=args.smooth_len)
+                alpha=args.grad_floor, smooth_scale=args.smooth_len)
             (bl0, bl1), (bh0, bh1) = best_pair
             print('>>>·<<<')
             print('Optimal band pair: low %g-%g Hz | high %g-%g Hz'
@@ -662,40 +660,40 @@ def main():
             res = das_bi(das_data=data, delta=delta, bands=bands,
                          wind_len=wind_len_coh, wind_step=wind_step_coh,
                          block=args.block_channels, alpha=args.grad_floor,
-                         channel_dx=args.channel_dx, smooth_len=args.smooth_len)
+                         smooth_scale=args.smooth_len)
             bi = res['bi']
             print('>>>·<<<')
-            print('BI: %d blocks, median %.3f, max %.3f at %.0f m'
+            print('BI: %d blocks, median %.3f, max %.3f at channel %d'
                   % (len(bi), np.median(bi), np.max(bi),
-                     res['block_distance'][int(np.argmax(bi))]))
+                     ci + res['block_channels'][int(np.argmax(bi))]
+                     + args.block_channels // 2))
             print('>>>·<<<')
 
             if args.bi_fig:
                 print('\nPlotting BI profile ...')
                 plot_bi_profile(bi, channel_begin=ci, block=args.block_channels,
-                                channel_dx=args.channel_dx, bands=bands,
-                                title=title_coh, figsave=args.bi_fig,
+                                bands=bands, title=title_coh,
+                                figsave=args.bi_fig,
                                 show=args.pcoh_show, dpi=dpi)
 
             if args.cohmap_fig:
                 print('\nPlotting C_smooth coherence map ...')
                 plot_coherence_map(res['c_smooth'], wind_step=wind_step_coh,
                                    channel_begin=ci, block=args.block_channels,
-                                   channel_dx=args.channel_dx, bands=bands,
-                                   title=title_coh, figsave=args.cohmap_fig,
+                                   bands=bands, title=title_coh,
+                                   figsave=args.cohmap_fig,
                                    show=args.pcoh_show, dpi=dpi)
 
             if args.bi_out:
                 print('\nSaving BI results ...')
                 np.savez(args.bi_out, bi=res['bi'],
-                         block_distance=res['block_distance'],
-                         block_channels=res['block_channels'],
+                         block_channels=ci + res['block_channels'],
                          c_raw=res['c_raw'], c_norm=res['c_norm'],
                          c_smooth=res['c_smooth'], times=res['times'],
                          bands=np.array(bands),
                          wind_len=wind_len_coh, wind_step=wind_step_coh,
                          block=args.block_channels, alpha=args.grad_floor,
-                         channel_dx=args.channel_dx, smooth_len=args.smooth_len)
+                         smooth_scale=args.smooth_len)
                 print('Saving BI >>> ' + args.bi_out + ' Successfully!')
 
     end_time = time.time()

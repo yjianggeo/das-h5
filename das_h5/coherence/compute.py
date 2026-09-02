@@ -109,25 +109,25 @@ def robust_normalise(c_raw):
     return out[0] if single else out
 
 
-def smooth_bi(c_norm, channel_dx, smooth_len):
+def smooth_bi(c_norm, smooth_scale=0.75):
     '''
     Spatial Gaussian smoothing of the normalised coherence field and temporal
     aggregation into the Burial Index (BI) profile (Eqs. 24-26).
     By yjianggeo 2026.09.02
 
     :param c_norm:      normalised coherence map [nwin, nblk]
-    :param channel_dx:  channel spacing [m]
-    :param smooth_len:  smoothing scale L_smooth [m]
+    :param smooth_scale: Gaussian sigma in channel samples
+                        (sigma = L_smooth / channel_dx; 0.75 = 3 m at 4 m
+                        spacing, the value used in the paper)
     :return:            c_smooth [nwin, nblk], bi [nblk]
     '''
-    sigma = smooth_len / channel_dx
-    c_smooth = gaussian_filter1d(c_norm, sigma, axis=1, mode='reflect')     # Eq. 24
+    c_smooth = gaussian_filter1d(c_norm, smooth_scale, axis=1, mode='reflect')  # Eq. 24
     bi = np.median(c_smooth, axis=0)                                        # Eq. 26
     return c_smooth, bi
 
 
 def das_bi(das_data, delta, bands, wind_len=2.0, wind_step=1.0, block=10,
-           block_step=None, alpha=0.05, channel_dx=4.0, smooth_len=3.0):
+           block_step=None, alpha=0.05, smooth_scale=0.75):
     '''
     Full Poincare spectral-coherence pipeline: DAS data -> BI profile.
     Default parameters follow Algorithm 1 of Shiri & Belal (2026).
@@ -141,10 +141,9 @@ def das_bi(das_data, delta, bands, wind_len=2.0, wind_step=1.0, block=10,
     :param block:       channels per block M
     :param block_step:  block step in channels (default = block)
     :param alpha:       gradient-floor factor
-    :param channel_dx:  channel spacing [m]
-    :param smooth_len:  smoothing scale L_smooth [m]
-    :return:            dict with times, block_channels, block_distance,
-                        c_raw, c_norm, c_smooth, bi, bands, params
+    :param smooth_scale: Gaussian smoothing sigma in channel samples
+    :return:            dict with times, block_channels, c_raw, c_norm,
+                        c_smooth, bi, bands, params
     '''
     times, p_low = das_fbe(das_data, delta, wind_len, wind_step, bands[0])
     _, p_high = das_fbe(das_data, delta, wind_len, wind_step, bands[1])
@@ -152,22 +151,19 @@ def das_bi(das_data, delta, bands, wind_len=2.0, wind_step=1.0, block=10,
                                                 block_step=block_step,
                                                 alpha=alpha)
     c_norm = robust_normalise(c_raw)
-    c_smooth, bi = smooth_bi(c_norm, channel_dx, smooth_len)
+    c_smooth, bi = smooth_bi(c_norm, smooth_scale)
     if block_step is None:
         block_step = block
-    block_distance = (block_begin + block / 2.0) * channel_dx
     return {'times': times, 'block_channels': block_begin,
-            'block_distance': block_distance, 'c_raw': c_raw,
-            'c_norm': c_norm, 'c_smooth': c_smooth, 'bi': bi,
-            'bands': bands,
+            'c_raw': c_raw, 'c_norm': c_norm, 'c_smooth': c_smooth,
+            'bi': bi, 'bands': bands,
             'params': {'wind_len': wind_len, 'wind_step': wind_step,
                        'block': block, 'block_step': block_step,
-                       'alpha': alpha, 'channel_dx': channel_dx,
-                       'smooth_len': smooth_len}}
+                       'alpha': alpha, 'smooth_scale': smooth_scale}}
 
 
 def optimize_band_pair(das_data, delta, wind_len=2.0, wind_step=1.0, block=10,
-                       alpha=0.05, channel_dx=4.0, smooth_len=3.0,
+                       alpha=0.05, smooth_scale=0.75,
                        low_cands=None, high_cands=None,
                        low_range=(0.5, 12.0), low_bin=1.0,
                        high_range=(15.0, 250.0), high_bin=5.0):
@@ -189,8 +185,7 @@ def optimize_band_pair(das_data, delta, wind_len=2.0, wind_step=1.0, block=10,
     :param wind_step:   window hop [s]
     :param block:       channels per block M
     :param alpha:       gradient-floor factor
-    :param channel_dx:  channel spacing [m]
-    :param smooth_len:  smoothing scale L_smooth [m]
+    :param smooth_scale: Gaussian smoothing sigma in channel samples
     :param low_cands:   low-band candidates [(f0, f1), ...], default:
                         starts 0.5/1/2/3 Hz x ends 5/8/10/12 Hz (width >= 2 Hz)
     :param high_cands:  high-band candidates [(f0, f1), ...], default:
@@ -236,7 +231,7 @@ def optimize_band_pair(das_data, delta, wind_len=2.0, wind_step=1.0, block=10,
         return binned[:, :, i0:i1].sum(axis=2).astype(np.float64)
 
     def bi_of(c_raw):
-        c_smooth, bi = smooth_bi(robust_normalise(c_raw), channel_dx, smooth_len)
+        c_smooth, bi = smooth_bi(robust_normalise(c_raw), smooth_scale)
         return bi
 
     scores = []

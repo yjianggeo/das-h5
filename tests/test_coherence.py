@@ -43,7 +43,7 @@ def test_bi_marks_irregular_block():
     data, delta = _synthetic_irregular_block()
     res = das_bi(data, delta, bands=((0.5, 5.0), (50.0, 70.0)),
                  wind_len=2.0, wind_step=1.0, block=10, alpha=0.05,
-                 channel_dx=1.0, smooth_len=1.0)
+                 smooth_scale=1.0)
     bi = res['bi']
     assert len(bi) == 4                       # 40 channels / block 10
     assert np.all(bi > 0)
@@ -69,7 +69,7 @@ def test_optimize_band_pair_finds_hf_contrast():
     high_cands = [(50.0, 70.0), (80.0, 95.0)]     # second misses the 60 Hz part
     best, scores = optimize_band_pair(
         data, delta, wind_len=2.0, wind_step=2.0, block=10, alpha=0.05,
-        channel_dx=1.0, smooth_len=1.0,
+        smooth_scale=1.0,
         low_cands=low_cands, high_cands=high_cands,
         low_range=(0.5, 40.0), low_bin=1.0,
         high_range=(45.0, 95.0), high_bin=5.0)

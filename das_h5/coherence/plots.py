@@ -6,11 +6,11 @@ from matplotlib import pyplot as plt
 
 
 def plot_coherence_map(c_smooth, wind_step=1.0, channel_begin=0, block=10,
-                       block_step=None, channel_dx=4.0, bands=None, title=None,
+                       block_step=None, bands=None, title=None,
                        figsave=None, show=False, dpi=300, figsize=None,
                        cmap='inferno', vmax_quantile=99.0):
     '''
-    Plot the smoothed normalised coherence map C_smooth (time-distance).
+    Plot the smoothed normalised coherence map C_smooth (time-channel).
     By yjianggeo 2026.09.02
 
     :param c_smooth:        smoothed coherence map [nwin, nblk]
@@ -18,7 +18,6 @@ def plot_coherence_map(c_smooth, wind_step=1.0, channel_begin=0, block=10,
     :param channel_begin:   first channel of the data
     :param block:           channels per block M
     :param block_step:      block step in channels (default = block)
-    :param channel_dx:      channel spacing [m]
     :param bands:           ((l0, l1), (h0, h1)) used for the fingerprints
     :param title:           head of title
     :param figsave:         save fig file
@@ -34,15 +33,15 @@ def plot_coherence_map(c_smooth, wind_step=1.0, channel_begin=0, block=10,
     if figsize is None:
         figsize = [10, 5.5]
     nwin, nblk = c_smooth.shape
-    d0 = (channel_begin + block / 2.0) * channel_dx
-    d1 = (channel_begin + (nblk - 1) * block_step + block / 2.0) * channel_dx
+    ch0 = channel_begin + block / 2.0
+    ch1 = channel_begin + (nblk - 1) * block_step + block / 2.0
     vmax = np.percentile(c_smooth, vmax_quantile)
 
     fig = plt.figure(figsize=figsize, dpi=dpi)
     ax = plt.axes([0.10, 0.12, 0.80, 0.80])
     cax = fig.add_axes([0.915, 0.12, 0.015, 0.80])
     im = ax.imshow(c_smooth.T, cmap=cmap, aspect='auto', origin='lower',
-                   extent=[0, nwin * wind_step, d0, d1], vmin=0, vmax=vmax)
+                   extent=[0, nwin * wind_step, ch0, ch1], vmin=0, vmax=vmax)
     band_str = ''
     if bands:
         band_str = ' | %g-%g / %g-%g Hz' % (bands[0][0], bands[0][1],
@@ -53,7 +52,7 @@ def plot_coherence_map(c_smooth, wind_step=1.0, channel_begin=0, block=10,
         title = 'Poincare spectral coherence C_smooth' + band_str
     ax.set_title(title, fontsize=15)
     ax.set_xlabel('Time [s]', fontsize=13)
-    ax.set_ylabel('Distance along cable [m]', fontsize=13)
+    ax.set_ylabel('Channel [number]', fontsize=13)
     plt.setp(ax.get_xticklabels(), size=11)
     plt.setp(ax.get_yticklabels(), size=11)
     cbar = plt.colorbar(im, cax=cax)
@@ -66,17 +65,17 @@ def plot_coherence_map(c_smooth, wind_step=1.0, channel_begin=0, block=10,
 
 
 def plot_bi_profile(bi, channel_begin=0, block=10, block_step=None,
-                    channel_dx=4.0, bands=None, title=None, figsave=None,
+                    bands=None, title=None, figsave=None,
                     show=False, dpi=300, figsize=None, log_scale=True):
     '''
-    Plot the BI (burial / coupling-irregularity index) profile along the cable.
+    Plot the BI (burial / coupling-irregularity index) profile along the
+    channels.
     By yjianggeo 2026.09.02
 
     :param bi:              BI profile [nblk]
     :param channel_begin:   first channel of the data
     :param block:           channels per block M
     :param block_step:      block step in channels (default = block)
-    :param channel_dx:      channel spacing [m]
     :param bands:           ((l0, l1), (h0, h1)) used for the fingerprints
     :param title:           head of title
     :param figsave:         save fig file
@@ -90,12 +89,11 @@ def plot_bi_profile(bi, channel_begin=0, block=10, block_step=None,
         block_step = block
     if figsize is None:
         figsize = [10, 5]
-    dist = (channel_begin + np.arange(len(bi)) * block_step + block / 2.0) \
-        * channel_dx
+    channels = channel_begin + np.arange(len(bi)) * block_step + block / 2.0
 
     fig = plt.figure(figsize=figsize, dpi=dpi)
     ax = plt.axes([0.10, 0.13, 0.85, 0.79])
-    ax.plot(dist, bi, lw=1.6, marker='o', ms=3.5, color='tab:blue')
+    ax.plot(channels, bi, lw=1.6, marker='o', ms=3.5, color='tab:blue')
     if log_scale:
         ax.set_yscale('log')
     band_str = ''
@@ -107,7 +105,7 @@ def plot_bi_profile(bi, channel_begin=0, block=10, block_step=None,
     else:
         title = 'BI profile (median of C_smooth over time)' + band_str
     ax.set_title(title, fontsize=15)
-    ax.set_xlabel('Distance along cable [m]', fontsize=13)
+    ax.set_xlabel('Channel [number]', fontsize=13)
     ax.set_ylabel('BI', fontsize=13)
     ax.grid(alpha=0.3, which='both')
     plt.setp(ax.get_xticklabels(), size=11)

@@ -159,10 +159,10 @@ Activate with `-pc` (compute BI) and/or `-obp` (search the optimal band pair). T
 | `-pc` | `--poincare_coh` | Compute the BI profile |
 | `-obp` | `--opt_band_pair` | Search the optimal band pair (scan) |
 | `-lb` / `-hb` | `--low_band` / `--high_band` | Fingerprint bands in Hz, e.g. `-lb 0.1 10 -hb 100 120` |
-| `-nb` / `-dx` | `--block_channels` / `--channel_dx` | Channels per block (default 10) / channel spacing in m (default 4.0) |
-| `-sml` / `-gf` | `--smooth_len` / `--grad_floor` | Smoothing scale in m (default 3.0) / gradient-floor factor α (default 0.05) |
+| `-nb` / `-sml` | `--block_channels` / `--smooth_len` | Channels per block (default 10) / smoothing sigma in channel samples (default 0.75 = 3 m at 4 m spacing) |
+| `-gf` | `--grad_floor` | Gradient-floor factor α (default 0.05) |
 | `-bio` | `--bi_out` | Save BI + coherence maps to a `.npz` file |
-| `-bif` / `-cmf` | `--bi_fig` / `--cohmap_fig` | Save BI profile / C_smooth map figure |
+| `-bif` / `-cmf` | `--bi_fig` / `--cohmap_fig` | Save BI profile / C_smooth map figure (axes in channel numbers) |
 | `-bsf` | `--bandscore_fig` | Save the band-pair score heatmap |
 | `-pcs` | `--pcoh_show` | Show the figures |
 
@@ -171,15 +171,15 @@ Activate with `-pc` (compute BI) and/or `-obp` (search the optimal band pair). T
 ```bash
 # Optimal band pair search + score heatmap
 dash5 -h5 -idb h5_test.db -T 20230705174505 -b 0 -e 120 -c 0 -C 831 \
-      -obp -dx 4.09 -bsf bandscore.png
+      -obp -bsf bandscore.png
 
 # BI with a given band pair, save figure + npz
 dash5 -h5 -idb h5_test.db -T 20230705174505 -b 0 -e 120 -c 0 -C 831 \
-      -pc -lb 0.1 10 -hb 100 120 -dx 4.09 -bif bi.png -cmf csmooth.png -bio bi.npz
+      -pc -lb 0.1 10 -hb 100 120 -bif bi.png -cmf csmooth.png -bio bi.npz
 
 # BI with automatic band-pair optimisation
 dash5 -h5 -idb h5_test.db -T 20230705174505 -b 0 -e 120 -c 0 -C 831 \
-      -pc -dx 4.09 -bif bi.png
+      -pc -bif bi.png
 ```
 
 **Examples:**
@@ -410,10 +410,10 @@ dash5 -h5 -d h5_file/ -idb h5_test.db -T 20230705174505 -b 0 -e 60 -c 0 -C 100 -
 | `-pc` | `--poincare_coh` | 计算 BI 剖面 |
 | `-obp` | `--opt_band_pair` | 搜索最优频带对（扫描）|
 | `-lb` / `-hb` | `--low_band` / `--high_band` | 谱指纹频带（Hz），如 `-lb 0.1 10 -hb 100 120` |
-| `-nb` / `-dx` | `--block_channels` / `--channel_dx` | 每块道数（默认 10）/ 道间距（米，默认 4.0）|
-| `-sml` / `-gf` | `--smooth_len` / `--grad_floor` | 平滑尺度（米，默认 3.0）/ 梯度下限因子 α（默认 0.05）|
+| `-nb` / `-sml` | `--block_channels` / `--smooth_len` | 每块道数（默认 10）/ 平滑 sigma（以道数计，默认 0.75，即 4 m 道间距下的 3 m）|
+| `-gf` | `--grad_floor` | 梯度下限因子 α（默认 0.05）|
 | `-bio` | `--bi_out` | 把 BI 与相干图保存为 `.npz` |
-| `-bif` / `-cmf` | `--bi_fig` / `--cohmap_fig` | 保存 BI 剖面图 / C_smooth 相干图 |
+| `-bif` / `-cmf` | `--bi_fig` / `--cohmap_fig` | 保存 BI 剖面图 / C_smooth 相干图（坐标为道号）|
 | `-bsf` | `--bandscore_fig` | 保存频带对得分热图 |
 | `-pcs` | `--pcoh_show` | 显示图件 |
 
@@ -422,15 +422,15 @@ dash5 -h5 -d h5_file/ -idb h5_test.db -T 20230705174505 -b 0 -e 60 -c 0 -C 100 -
 ```bash
 # 最优频带对搜索 + 得分热图
 dash5 -h5 -idb h5_test.db -T 20230705174505 -b 0 -e 120 -c 0 -C 831 \
-      -obp -dx 4.09 -bsf bandscore.png
+      -obp -bsf bandscore.png
 
 # 指定频带对计算 BI，保存图件与 npz
 dash5 -h5 -idb h5_test.db -T 20230705174505 -b 0 -e 120 -c 0 -C 831 \
-      -pc -lb 0.1 10 -hb 100 120 -dx 4.09 -bif bi.png -cmf csmooth.png -bio bi.npz
+      -pc -lb 0.1 10 -hb 100 120 -bif bi.png -cmf csmooth.png -bio bi.npz
 
 # 自动搜索最优频带对并计算 BI
 dash5 -h5 -idb h5_test.db -T 20230705174505 -b 0 -e 120 -c 0 -C 831 \
-      -pc -dx 4.09 -bif bi.png
+      -pc -bif bi.png
 ```
 
 **示例：**
